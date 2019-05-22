@@ -1,0 +1,18 @@
+{
+  "emb_size": 200,
+  "cbow_op": "mean",
+  "window_size": 10,
+
+  "batch_size": 128,
+  "log_freq": 1600,
+  "lr": 0.1,
+  "lr_drop_factor": 0.99,
+  "device": "cuda:0",
+  "optimizer": "sgd",
+
+  "threshold_count":5,
+  "model": "hier_softmax",
+
+  "num_workers": 12,
+  "epochs": 200
+}

@@ -1,0 +1,17 @@
+{
+  "emb_size": 200,
+  "neg_samples": 20,
+  "window_size": 6,
+
+  "batch_size": 4096,
+  "log_freq": 200,
+  "lr": 0.001,
+  "device": "cuda:0",
+  "optimizer": "adam",
+
+  "threshold_count":5,
+  "model": "neg_sampling",
+  "downsampling_params": [62, 1000],
+  "num_workers": 12,
+  "epochs": 200
+}
