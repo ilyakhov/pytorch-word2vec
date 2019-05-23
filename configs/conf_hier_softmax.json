@@ -1,7 +1,9 @@
 {
-  "emb_size": 200,
+  "emb_dim": 200,
   "cbow_op": "mean",
   "window_size": 10,
+  "emb_max_norm": 1.0,
+  "emb_norm_type": 2.0,
 
   "batch_size": 128,
   "log_freq": 1600,

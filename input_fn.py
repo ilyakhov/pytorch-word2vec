@@ -14,6 +14,7 @@ class CBOWDataSet(Dataset):
                  max_path_len=17,
                  window_size=6,
                  device=None,
+                 skip_target=False,
                  dtype=torch.float32):
         """
 
@@ -51,6 +52,7 @@ class CBOWDataSet(Dataset):
             self.max_path_len = max_path_len
             self.turns_index = turns_index
             self.vocab_size = vocab_size
+            self.skip_target = skip_target
         elif self.pipeline == 'neg_sampling':
             self.np_corpus = np.array(self.corpus)
             self.neg_samples = neg_samples
@@ -109,7 +111,10 @@ class CBOWDataSet(Dataset):
         context = torch.tensor(context, dtype=torch.long, device=self.device)
         target = torch.tensor(target, dtype=torch.long, device=self.device)
 
-        return context, target, nodes, mask, turns_coeffs
+        if self.skip_target is False:
+            return context, target, nodes, mask, turns_coeffs
+        else:
+            return context, nodes, mask, turns_coeffs
 
     def __n_getitem(self, i):
         """

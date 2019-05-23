@@ -1,5 +1,5 @@
 {
-  "emb_size": 200,
+  "emb_dim": 200,
   "neg_samples": 20,
   "window_size": 6,
 

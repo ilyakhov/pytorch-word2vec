@@ -3,7 +3,11 @@ from torch import nn
 
 
 class CBOWHierSoftmax(nn.Module):
-    def __init__(self, emb_count, emb_dim, cbow_op='sum', dtype=None):
+    def __init__(self, emb_count, emb_dim,
+                 cbow_op='sum',
+                 emb_max_norm=1.0,
+                 emb_norm_type=2.0,
+                 dtype=None):
         """
 
         :param emb_count:
@@ -18,8 +22,8 @@ class CBOWHierSoftmax(nn.Module):
             num_embeddings=emb_count + 1,  # the last for PAD value
             embedding_dim=emb_dim,
             padding_idx=emb_count,  # with torch.no_grad(): for pad value
-            max_norm=1.0,
-            norm_type=2.0,
+            max_norm=emb_max_norm,
+            norm_type=emb_norm_type,
             scale_grad_by_freq=False,
             sparse=False)
 

@@ -5,11 +5,13 @@ import time
 import pickle
 import os
 import logging
+import json
+import argparse
 
 from utils.process_data import process_data
 from model_fn import CBOWHierSoftmax, CBOWNegativeSampling
 from input_fn import CBOWDataSet
-from utils.utils import set_logger, str2bool, Params
+from utils.utils import set_logger, str2bool, Params, make_directory
 
 
 def train_fn(params, loader, device):
@@ -17,13 +19,16 @@ def train_fn(params, loader, device):
         model = CBOWNegativeSampling(
             emb_count=params.emb_count,
             emb_dim=params.emb_dim,
-            neg_sampling_factor=params.neg_samples
+            neg_sampling_factor=params.neg_samples,
+            device=device
         )
     elif params.model == 'hier_softmax':
         model = CBOWHierSoftmax(
             emb_count=params.emb_count,
             emb_dim=params.emb_dim,
-            cbow_op=params.cbow_op
+            cbow_op=params.cbow_op,
+            emb_max_norm=params.emb_max_norm,
+            emb_norm_type=params.emb_norm_type,
         )
     else:
         raise NotImplementedError(f'Wrong param model: {params.model}')
@@ -40,9 +45,10 @@ def train_fn(params, loader, device):
 
     epochs = params.epochs
 
-    if params.get('lr_drop_factor') is not None:
+    use_scheduler = False
+    if getattr(params, 'lr_drop_factor', None) is not None:
         use_scheduler = True
-        schedule_fn = lambda epoch: params.get.lr_drop_factor ** epoch
+        schedule_fn = lambda epoch: params.lr_drop_factor ** epoch
         scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer,
                                                       lr_lambda=[schedule_fn],
                                                       last_epoch=-1)
@@ -52,19 +58,17 @@ def train_fn(params, loader, device):
         total_loss = 0
         iterator = loader
         i = 0
-
         # Print Learning Rate
         if use_scheduler:
             _lr = scheduler.get_lr()[0]
         else:
             _lr = params.lr
-        logging.info('Epoch:', epoch, 'LR:', _lr)
-        for context, target in iterator:
+        logging.info(f'Epoch: {epoch}; LR: {_lr}')
+        for input in iterator:
             i += 1
-
-            context, target = context.to(device), target.to(device)
+            input = [i.to(device) for i in input]
             model.zero_grad()
-            loss = model(context, target)
+            loss = model(*input)
 
             loss.backward()
             optimizer.step()
@@ -85,7 +89,7 @@ def train_fn(params, loader, device):
             os.mkdir(folder)
 
         savepath =\
-            f'{folder}/e{epoch}-{batch_size}-lr{_lr:.5f}-' \
+            f'{folder}/e{epoch}-{params.batch_size}-lr{_lr:.5f}-' \
             f'loss{total_loss/fstep:.5f}-w2vec-bible.ckpt.tar'
         torch.save({
             'epoch': epoch,
@@ -105,15 +109,18 @@ def train_fn(params, loader, device):
 
 
 if __name__ == '__main__':
-    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--folder', '-f', type=str, default='/tmp/',
                         help='async/not-async requests')
     parser.add_argument('--config', '-c', type=str, default=None,
                         help='fullpath to conf.json')
-    parser.add_argument('--datapath', '-d', type=str, default='./bible.txt')
-
+    parser.add_argument('--datapath', '-d', type=str,
+                        default='./data/bible.txt')
     FLAGS = parser.parse_args()
+
+    if not os.path.exists(FLAGS.folder):
+        make_directory(FLAGS.folder)
+
     set_logger(os.path.join(FLAGS.folder, 'train.log'))
     if FLAGS.config is None:
         try:
@@ -122,6 +129,11 @@ if __name__ == '__main__':
             raise FileNotFoundError('config.json is not found!')
     params = Params(jsonpath=FLAGS.config)
 
+    logging.info('Start word2vec training pipeline! Params:')
+    logging.info(
+        json.dumps(params.__dict__, indent=True)
+    )
+
     if params.model not in ['hier_softmax', 'neg_sampling']:
         raise NotImplementedError(f"{params.model} model is not supported!")
 
@@ -129,12 +141,12 @@ if __name__ == '__main__':
     logging.info('Loading data:')
 
     processed_datapath = os.path.join(FLAGS.folder,
-                                      f'{FLAGS.model}_processed_data.pkl')
+                                      f'{params.model}_processed_data.pkl')
 
     processing_params = dict(
         threshold_count=params.threshold_count,
         pipeline=params.model,
-        downsampling_params=params.get('downsampling_params')
+        downsampling_params=getattr(params, 'downsampling_params', None)
     )
     try:
         loaded_params, out = \
@@ -147,9 +159,11 @@ if __name__ == '__main__':
                     open(processed_datapath, 'wb'))
     if params.model == 'neg_sampling':
         corpus, words_hash_inversed, vocab_size = out
+        params.emb_count = vocab_size
     elif params.model == 'hier_softmax':
         corpus, node_inxs, turns_inxs, leaves_hash_inversed, \
             vocab_size, nodes_count = out
+        params.emb_count = nodes_count
 
     device = torch.device(params.device)
 
@@ -166,6 +180,7 @@ if __name__ == '__main__':
                                    turns_index=turns_inxs,
                                    vocab_size=nodes_count,
                                    window_size=params.window_size,
+                                   skip_target=True,
                                    device=None)
 
     data_len = cbow_dataset.__len__()

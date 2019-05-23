@@ -1,5 +1,7 @@
 import logging
 import json
+import os
+import argparse
 
 
 def set_logger(log_path):
@@ -37,7 +39,7 @@ class Params:
     def load(self, path):
         params = json.load(open(path))
         self.__dict__.update(params)
-        if getattr(self, 'downsampling_params') is not None:
+        if getattr(self, 'downsampling_params', None) is not None:
             setattr(self, 'downsampling_params',
                     tuple(self.downsampling_params))
 
@@ -49,3 +51,22 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def make_directory(path):
+    path = os.path.abspath(path)
+    if os.path.exists(path):
+        return 'Path {} exists!'.format(path)
+    else:
+        splits = path.split('/')
+        newpath = '/'
+        for i, split in enumerate(splits):
+            if split == '': continue
+            newpath = os.path.join(newpath, split)
+            if os.path.exists(newpath): continue
+            else:
+                os.mkdir(newpath)
+        if os.path.exists(path):
+            return 'Path {} created!'.format(path)
+        else:
+            raise FileExistsError('Path {} creation is failed!'.format(path))
